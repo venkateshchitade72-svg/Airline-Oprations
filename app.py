@@ -1,4 +1,5 @@
 import os
+
 from base64 import b64encode
 from datetime import date, datetime
 from pathlib import Path
@@ -59,12 +60,36 @@ def setting(name, default=""):
 
 
 def connect_database():
+    host = setting("AIR_DB_HOST", "localhost")
+    port = setting("AIR_DB_PORT", "3306")
+    user = setting("AIR_DB_USER", "root")
+    password = setting("AIR_DB_PASSWORD", "venky07")
+    database_name = setting("AIR_DB_NAME", "air")
+
+    missing = []
+    if not host:
+        missing.append("AIR_DB_HOST")
+    if not port:
+        missing.append("AIR_DB_PORT")
+    if not user:
+        missing.append("AIR_DB_USER")
+    if password is None or password == "":
+        missing.append("AIR_DB_PASSWORD")
+    if not database_name:
+        missing.append("AIR_DB_NAME")
+
+    if missing:
+        raise ValueError(
+            "Missing required MySQL settings: " + ", ".join(missing) + ". "
+            "Set them in Streamlit secrets or environment variables before running the app."
+        )
+
     return mysql.connector.connect(
-        host=setting("AIR_DB_HOST", "localhost"),
-        port=int(setting("AIR_DB_PORT", "3306")),
-        user=setting("AIR_DB_USER", "root"),
-        password=setting("AIR_DB_PASSWORD"),
-        database=setting("AIR_DB_NAME", "air"),
+        host=host,
+        port=int(port),
+        user=user,
+        password=password,
+        database=database_name,
         connection_timeout=int(setting("AIR_DB_CONNECT_TIMEOUT", "5")),
     )
 
@@ -162,7 +187,7 @@ def dashboard(connection):
                ORDER BY p.journey_date DESC LIMIT 8""",
         )
         if recent:
-            st.dataframe(pd.DataFrame(recent), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(recent), hide_index=True, width="stretch")
         else:
             st.info("No bookings to show yet.")
 
@@ -201,7 +226,7 @@ def customers_page(connection):
     else:
         filtered = records
     st.caption(f"Showing {len(filtered)} of {len(records)} passengers")
-    st.dataframe(pd.DataFrame(filtered), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(filtered), hide_index=True, width="stretch")
 
     if records:
         st.divider()
@@ -326,7 +351,7 @@ def booking_page(connection):
            FROM pdata p INNER JOIN ticket t ON p.custno = t.custno
            ORDER BY p.journey_date DESC""",
     )
-    st.dataframe(pd.DataFrame(bookings), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(bookings), hide_index=True, width="stretch")
     if bookings:
         st.subheader("Edit booking details")
         booking_index = st.selectbox(
@@ -374,7 +399,7 @@ def catalog_page(connection):
     classes_tab, food_tab = st.tabs(["Fare classes", "Food menu"])
     with classes_tab:
         class_rows = fetch_rows(connection, "SELECT sno AS `Serial #`, itemname AS Class, rate AS `Fare (₹)` FROM classtype ORDER BY rate DESC")
-        st.dataframe(pd.DataFrame(class_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(class_rows), hide_index=True, width="stretch")
         with st.expander("Add fare class"):
             with st.form("add_class", clear_on_submit=True):
                 serial = st.number_input("Serial number", min_value=1, step=1, key="class_serial")
@@ -404,7 +429,7 @@ def catalog_page(connection):
 
     with food_tab:
         food_rows = fetch_rows(connection, "SELECT sno AS `Serial #`, itemname AS Item, price AS `Price (₹)` FROM foodinfo ORDER BY itemname")
-        st.dataframe(pd.DataFrame(food_rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(food_rows), hide_index=True, width="stretch")
         with st.expander("Add food item"):
             with st.form("add_food", clear_on_submit=True):
                 food_serial = st.number_input("Serial number", min_value=1, step=1, key="food_serial")
@@ -443,12 +468,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+database = None
+
 try:
     database = connect_database()
     ensure_ticket_food_columns(database)
+except ValueError as error:
+    st.error(f"Database configuration error: {error}")
+    st.info("Set the required MySQL variables in Streamlit secrets or your shell environment. For hosted deployments, use the deployed database server address, not localhost.")
+    st.stop()
 except mysql.connector.Error as error:
     st.error(f"Could not connect to the MySQL database: {error}")
-    st.info("Confirm MySQL is running, the `air` database and expected tables exist, then configure the database connection using the README.")
+    st.info("Confirm MySQL is running, the database is reachable from this host, and the credentials match the server you are deploying to.")
     st.stop()
 
 try:
@@ -461,8 +492,10 @@ try:
     else:
         catalog_page(database)
 except mysql.connector.Error as error:
-    database.rollback()
+    if database is not None:
+        database.rollback()
     st.error(f"Database operation failed: {error}")
     st.caption("Check that the `air` database has the `pdata`, `ticket`, `classtype`, and `foodinfo` tables with the columns used by the original program.")
 finally:
-    database.close()
+    if database is not None:
+        database.close()

@@ -5,8 +5,20 @@ import datetime
 import joblib
 import streamlit
 
-mydb=mysql.connector.connect(host="localhost",user="root",passwd=os.getenv("AIR_DB_PASSWORD", ""),database="air")
-mycursor=mydb.cursor()
+
+def connect_db():
+    return mysql.connector.connect(
+        host=os.getenv("AIR_DB_HOST", "localhost"),
+        port=int(os.getenv("AIR_DB_PORT", "3306")),
+        user=os.getenv("AIR_DB_USER", "root"),
+        password=os.getenv("AIR_DB_PASSWORD", "venky07"),
+        database=os.getenv("AIR_DB_NAME", "air"),
+        connection_timeout=int(os.getenv("AIR_DB_CONNECT_TIMEOUT", "5")),
+    )
+
+
+mydb = connect_db()
+mycursor = mydb.cursor()
 print("PROJECT BY -")
 print("              VENKATESH CHITADE                    ")
 
@@ -132,6 +144,7 @@ def ticketprice():
     print('3. type Economy class--->rs 2000 PN\-')
     x=int(input('Enter your choice:'))
     n=1
+    s = 0
     if x==1:
         print('you have opted First class.')
         s=6000*n
@@ -225,14 +238,19 @@ def Menuset():
         quit()
     else:
         print('Enter correct choice.')
-Menuset()
+
+
 def runagain():
     runagn=input('\nWant to run again? y/n:')
-    while runagn=='y':
-        if platform.system=='windows':
+    while runagn.lower()=='y':
+        if platform.system() == 'Windows':
             print(os.system('cls'))
         else:
             print(os.system('clear'))
         Menuset()
         runagn=input('\nWant to run again? y/n:')
-runagain()
+
+
+if __name__ == "__main__":
+    Menuset()
+    runagain()

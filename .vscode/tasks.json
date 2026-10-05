@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Push Airline project to GitHub",
+			"type": "shell",
+			"command": "git -C \"C:/Users/Admin/Desktop/venkatesh\" status --short --branch; git -C \"C:/Users/Admin/Desktop/venkatesh\" add -A; git -C \"C:/Users/Admin/Desktop/venkatesh\" commit -m \"fix\"; git -C \"C:/Users/Admin/Desktop/venkatesh\" push origin main",
+			"isBackground": false,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
